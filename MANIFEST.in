@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include mdpl_addons *.css
+recursive-include mdpl_addons *.csv
+recursive-include mdpl_addons *.html
+recursive-include mdpl_addons *.ico
+recursive-include mdpl_addons *.js
+recursive-include mdpl_addons *.json
+recursive-include mdpl_addons *.md
+recursive-include mdpl_addons *.png
+recursive-include mdpl_addons *.py
+recursive-include mdpl_addons *.svg
+recursive-include mdpl_addons *.txt
+recursive-exclude mdpl_addons *.pyc
