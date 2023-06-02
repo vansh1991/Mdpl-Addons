@@ -10,196 +10,259 @@ from frappe.utils.data import date_diff
 def execute(filters):
     columns, data = [], []
     columns = [
-        {
-        "label": _("Voucher No."),
-     			"fieldname": "voucher_no",
-     			"fieldtype": "Link",
-     			"options": "Payment Entry",
-     			"width": 180
-    },
-        {
-        "label": _("Cheque Received Date"),
-     			"fieldname": "cheque_rec_date",
-     			"fieldtype": "Date",
-     			"width": 150
-    },
 		{
-        "label": _("Cheque Number"),
-     			"fieldname": "ref_number",
-     			"fieldtype": "Data",
-    },
+        		"label": _("Customer"),
+     			"fieldname": "customer",
+     			"fieldtype": "Link",
+     			"options": "CUstomer",
+     			"width": 180
+    	},
         {
-        "label": _("Amount Received"),
-     			"fieldname": "amount_received",
-     			"fieldtype": "Currency",
-     			"width": 150
-    },
-        {
-        "label": _("Cheque Received Days"),
-     			"fieldname": "cheq_rec_days",
-     			"fieldtype": "Data",
-     			"width": 150
-    },
-        {
-        "label": _("Sales Invoice Date"),
-     			"fieldname": "si_date",
-     			"fieldtype": "Date",
-     			"width": 150
-    },
-        {
-        "label": _("Sales Invoice"),
+        		"label": _("Sales Invoice"),
      			"fieldname": "sales_invoice",
      			"fieldtype": "Link",
      			"options": "Sales Invoice",
-     			"width": 150
-    },
+     			"width": 180
+    	},
         {
-        "label": _("Total Bill Amount"),
+        		"label": _("Sales Invoice Date"),
+     			"fieldname": "si_date",
+     			"fieldtype": "Date",
+     			"width": 150
+    	},
+        {
+        		"label": _("Total Bill Amount"),
      			"fieldname": "total_bill_amount",
      			"fieldtype": "Currency",
      			"width": 150
-    },
-        {
-        "label": _("Total Outstanding"),
-     			"fieldname": "total_outstanding",
+    	},
+		{
+        		"label": _("Allocated Amount"),
+     			"fieldname": "allocated_amount",
      			"fieldtype": "Currency",
      			"width": 150
-    },
+    	},
         {
-        "label": _("Status"),
+        		"label": _("Total Outstanding"),
+     			"fieldname": "total_outstanding",
+     			"fieldtype": "Float",
+     			"width": 150
+    	},
+		{
+        		"label": _("Payment Entry"),
+     			"fieldname": "payment_entry",
+     			"fieldtype": "Link",
+     			"options": "Payment Entry",
+     			"width": 180
+    	},
+		{
+        		"label": _("Cheque Amount"),
+     			"fieldname": "paid_amount",
+     			"fieldtype": "Currency",
+     			"width": 150
+    	},
+		
+		{
+        		"label": _("Outstanding Days"),
+     			"fieldname": "outstanding_days",
+     			"fieldtype": "Data",
+     			"width": 150
+    	},
+		{
+        		"label": _("Cheque Days"),
+     			"fieldname": "cheque_days",
+     			"fieldtype": "Data",
+     			"width": 150
+    	},
+		{
+        		"label": _("Cheque Ref. No."),
+     			"fieldname": "ref_no",
+     			"fieldtype": "Data",
+     			"width": 150
+    	},
+		{
+        		"label": _("Cheque Ref. Date"),
+     			"fieldname": "ref_date",
+     			"fieldtype": "Date",
+     			"width": 150
+    	},
+        {
+        		"label": _("PE Status"),
      			"fieldname": "status",
      			"fieldtype": "Data",
      			"width": 150
-    },
-        {
-        "label": _("Total Ageing"),
-     			"fieldname": "total_ageing",
-     			"fieldtype": "Data",
-     			"width": 150
-    },
-        {
-        "label": _("Difference"),
-     			"fieldname": "difference",
-     			"fieldtype": "Currency",
-     			"width": 150
-    },
-        {
-        "label": _("Cheque Status"),
-     			"fieldname": "cheque_status",
-     			"fieldtype": "Data",
-     			"width": 150
-    },
-    ]
+    	}
+	]
 
     data = get_data(filters)
     return columns, data
 
 
+
 def get_data(filters=None):
-	conditions = []
+	conditions = ""
 	data = []
 
-	if filters.get('party'):
-		conditions.append("tpe.party = '{}' ".format(filters.get('party')))
+	if filters.from_date and filters.to_date:
+		conditions+=f" and tsi.posting_date between '{filters.get('from_date')}' and '{filters.get('to_date')}' "
+
+	get_customer_list=[]
+	if filters.get("customer"):
+		for d in filters.get("customer"):
+			frappe.log_error("customer",d)
+			get_customer_list.append({
+				"customer":d
+			})
+
+
+	else:
+		get_customer_list=frappe.db.sql("Select customer from `tabSales Invoice` where outstanding_amount > 0 and status != 'Return' group by customer",as_dict=1)
+
 	
-	if filters.get('payment_entry'):
-		conditions.append("tpe.name = '{}' ".format(filters.get('payment_entry')))
+	if get_customer_list:
+		pe_list = []
+		for cust in get_customer_list:
+			pe_list_invoice=frappe.db.sql(f"""select
+				tsi.customer as 'customer',
+				tsi.posting_date as 'si_date',
+				tsi.name as 'si_name',
+				tsi.status as 'ref_status',
+				tsi.rounded_total as 'total_amount',
+				tsi.outstanding_amount as 'outstanding_amount'
+				
+				from
+					`tabSales Invoice` as tsi where tsi.outstanding_amount > 0 and docstatus <=1 and tsi.status != 'Return' and tsi.customer='{cust['customer']}'
+				{conditions}
+				""",as_dict=True)
+			pe_list.append(pe_list_invoice)
 
-	if filters.get("voucher_date"):
-		if date_diff(filters.get("voucher_date")[1], filters.get("voucher_date")[0]) < 0:
-			frappe.throw('To Date must be greater than from date')
-		conditions.append("tpe.reference_date between '{}' and '{}' ".format(
-		    filters.get("voucher_date")[0], filters.get("voucher_date")[1]))
+		# Count=len(get_customer_list)
+		for pel in pe_list:
+			# frappe.log_error("Pe",pe)
+			customer_name=""
+			outstanding=0.0
+			ot_amount=0
+			for pe in pel:
+				if pe.si_name:
+					frappe.log_error("hh",filters.get("payment_entry"))
+					if filters.get("payment_entry") == None:
 
-	if filters.get('cheque_no'):
-		conditions.append("tpe.reference_no like '%%{}%%' ".format(
-		    filters.get('cheque_no')))
+						get_all_payment_entry=frappe.db.get_all("Payment Entry Reference",filters={"reference_name":pe.si_name,"reference_doctype":"Sales Invoice"},fields=["parent","allocated_amount","outstanding_amount","total_amount"])
+						if get_all_payment_entry:
+							# frappe.log_error("get_all_payment_entry",get_all_payment_entry)
+							
+							for pe_e in get_all_payment_entry:
+								outstanding_days=(frappe.utils.now_datetime().date() - pe.si_date).days
+								#out_total=#float(pe.total_amount)-float(pe_e.allocated_amount)
+								data.append({
+									"customer":pe.customer,
+									"sales_invoice": pe.si_name,
+									"si_date": pe.si_date,
+									"total_bill_amount": pe.total_amount,
+									"allocated_amount":pe_e.allocated_amount or 0,
+									"total_outstanding":pe.outstanding_amount,#out_total,
+									"payment_entry":pe_e.parent,
+									"paid_amount":frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"paid_amount") or 0,
+									"outstanding_days":outstanding_days,
+									"cheque_days":(frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"reference_date") -pe.si_date).days,
+									"ref_no":frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"reference_no"),
+									"ref_date":frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"reference_date"),
+									"status": frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"workflow_state")
+								})
+								# ot_amount+= pe_e.outstanding_amount
+						else:
+							outstanding_days=(frappe.utils.now_datetime().date() - pe.si_date).days
+							data.append({
+									"customer":pe.customer,
+									"sales_invoice": pe.si_name,
+									"si_date": pe.si_date,
+									"total_bill_amount": pe.total_amount,
+									"allocated_amount": 0,
+									"total_outstanding": pe.outstanding_amount or 0,
+									"payment_entry":"",
+									"paid_amount":0,
+									"outstanding_days":(frappe.utils.now_datetime().date() - pe.si_date).days,
+									"cheque_days":0,
+									"ref_no":"",
+									"ref_date":"",
+									"status": ""
+							})
+							# ot_amount+=	pe.outstanding_amount
+					elif filters.get("payment_entry") == "Yes":
+						get_all_payment_entry=frappe.db.get_all("Payment Entry Reference",filters={"reference_name":pe.si_name,"reference_doctype":"Sales Invoice"},fields=["parent","allocated_amount","outstanding_amount","total_amount"])
+						if get_all_payment_entry:
+							# frappe.log_error("get_all_payment_entry",get_all_payment_entry)
+							
+							for pe_e in get_all_payment_entry:
+								outstanding_days=(frappe.utils.now_datetime().date() - pe.si_date).days
+								out_total=float(pe.total_amount)-float(pe_e.allocated_amount)
+								data.append({
+									"customer":pe.customer,
+									"sales_invoice": pe.si_name,
+									"si_date": pe.si_date,
+									"total_bill_amount": pe.total_amount,
+									"allocated_amount":pe_e.allocated_amount or 0,
+									"total_outstanding":pe.outstanding_amount,#float(pe_e.total_amount)-float(pe_e.allocated_amount),
+									"payment_entry":pe_e.parent,
+									"paid_amount":frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"paid_amount") or 0,
+									"outstanding_days":outstanding_days,
+									"cheque_days":(frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"reference_date") -pe.si_date).days,
+									"ref_no":frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"reference_no"),
+									"ref_date":frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"reference_date"),
+									"status": frappe.db.get_value("Payment Entry",{"name":pe_e.parent},"workflow_state")
 
-	if filters.get('cheque_status'):
-		conditions.append("tpe.workflow_state = '{}' ".format(
-		    filters.get('cheque_status')))
+								})
+								# ot_amount+= pe_e.outstanding_amount
+					elif filters.get("payment_entry") == "No":
+						data.append({
+									"customer":pe.customer,
+									"sales_invoice": pe.si_name,
+									"si_date": pe.si_date,
+									"total_bill_amount": pe.total_amount,
+									"allocated_amount": 0,
+									"total_outstanding": pe.outstanding_amount or 0,
+									"payment_entry":"",
+									"paid_amount":0,
+									"outstanding_days":(frappe.utils.now_datetime().date() - pe.si_date).days,
+									"cheque_days":0,
+									"ref_no":"",
+									"ref_date":"",
+									"status": ""
+
+							})
+						# ot_amount+=	pe.outstanding_amount
+					customer_name=pe.customer
+					outstanding+=pe.outstanding_amount#get_outstanding(pe.si_name,filters.get("payment_entry"))
 
 
-	# if filters.get('item_code'):
-	# 	conditions.append("tsii.item_code = '{}' ".format(filters.get('item_code')))
+			# frappe.msgprint(str(pe_list))
+			if outstanding>0:
+				data.append({
+					"customer":customer_name,
+					"total_outstanding":outstanding
+				})
+				data.append({"customer":"","total_outstanding":""})
 
-	# if filters.get('serial_no'):
-	# 	conditions.append("tsii.serial_no like '%%{}%%' ".format(
-	# 	    filters.get('serial_no')))
-
-	where_clause = ""
-	if len(conditions) > 0:
-		where_clause = "and ".join(conditions)
-		where_clause = "and "+where_clause
-
-	pe_list = frappe.db.sql("""select
-			tpe.name,
-			tpe.reference_no,
-			tpe.reference_date,
-			tpe.paid_amount,
-			(
-			select
-				tsi.posting_date
-			from
-				`tabSales Invoice` tsi
-			where
-				tsi.name = tper.reference_name) as 'si_date',
-			(
-			select
-				tsi.status
-			from
-				`tabSales Invoice` tsi
-			where
-				tsi.name = tper.reference_name) as 'ref_status',
-			tper.reference_name,
-			tper.total_amount,
-			tper.outstanding_amount,
-			tpe.workflow_state as cheque_status
-		from
-			`tabPayment Entry` tpe
-		inner join `tabPayment Entry Reference` tper
-		on tpe.name = tper.parent
-		where tper.reference_doctype = "Sales Invoice"
-		and tpe.reference_no is not NULL and tpe.reference_date is not Null
-		and tpe.docstatus = 0
-		-- and tpe.workflow_state in ('Cheque Rejected', 'Cheque Received')
-		{}
-		""".format(where_clause), as_dict=True)
-	pe_id =  ""
-	for pe in pe_list:
-		if pe.reference_date is None:
-			a=0
-		cheque_received_days = (pe.reference_date - pe.si_date).days
-		ageing = (frappe.utils.now_datetime().date() - pe.si_date).days
-		diff_amount = pe.outstanding_amount - pe.paid_amount
-		if pe_id != pe.name:
-			data.append({
-						"voucher_no": pe.name,
-						"cheque_rec_date": pe.reference_date,
-						"ref_number": pe.reference_no,
-						"amount_received": pe.paid_amount,
-						"cheq_rec_days": cheque_received_days,
-						"si_date": pe.si_date,
-						"sales_invoice": pe.reference_name,
-						"total_bill_amount": pe.total_amount,
-						"total_outstanding": pe.outstanding_amount,
-						"status": pe.ref_status,
-						"total_ageing": str(ageing) + " Days",
-						"difference": diff_amount,
-						"cheque_status": pe.cheque_status,
-					})
-			pe_id = pe.name
-
-		else:
-			data.append({
-					"si_date": pe.si_date,
-					"sales_invoice": pe.reference_name,
-					"total_bill_amount": pe.total_amount,
-					"total_outstanding": pe.outstanding_amount,
-					"status": pe.ref_status,
-					"total_ageing": str(ageing) + " Days",
-					"difference": diff_amount,
-					"cheque_status": pe.cheque_status,
-                })
-			pe_id = pe.name
+		
+		frappe.log_error("customerlist",get_customer_list)
+		
 	return data
+
+
+def get_outstanding(bill_no,payment_entry):
+	get_all_payment_entry=frappe.db.get_all("Payment Entry Reference",filters={"reference_name":bill_no,"reference_doctype":"Sales Invoice"},fields=["parent","allocated_amount","outstanding_amount","total_amount"])
+	out_s=0
+	if payment_entry == None:
+		if get_all_payment_entry:
+			for pe_e in get_all_payment_entry:
+				out_s+=frappe.db.get_value("Sales Invoice",{"name":bill_no},"outstanding_amount")#float(pe_e.total_amount)-float(pe_e.allocated_amount)
+		else:
+			out_s+=frappe.db.get_value("Sales Invoice",{"name":bill_no},"outstanding_amount")
+	elif payment_entry == "Yes":
+		if get_all_payment_entry:
+			for pe_e in get_all_payment_entry:
+				out_s+=frappe.db.get_value("Sales Invoice",{"name":bill_no},"outstanding_amount")#float(pe_e.total_amount)-float(pe_e.allocated_amount)
+	elif payment_entry == "No":
+		out_s+=frappe.db.get_value("Sales Invoice",{"name":bill_no},"outstanding_amount")
+
+	return out_s

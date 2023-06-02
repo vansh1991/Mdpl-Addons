@@ -104,7 +104,8 @@ def get_data(filters=None):
 		serial_nos = ""
 		serial_nos = pi.serial_no
 		#frappe.log_error(serial_nos)
-		serial_nos = serial_nos.split('\n')
+		if serial_nos:
+			serial_nos = serial_nos.split('\n')
 
 		poe = "Haryana"
 		if serial_nos:
