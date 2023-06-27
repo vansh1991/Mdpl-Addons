@@ -133,7 +133,7 @@ def get_data(filters=None):
 				from
 					`tabSales Invoice` as tsi where tsi.outstanding_amount > 0 and docstatus <=1 and tsi.status != 'Return' and tsi.customer='{cust['customer']}'
 				{conditions}
-				""",as_dict=True)
+				order by tsi.posting_date asc""",as_dict=True)
 			pe_list.append(pe_list_invoice)
 
 		# Count=len(get_customer_list)
