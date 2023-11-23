@@ -110,15 +110,27 @@ def get_data(filters=None):
 		poe = "Haryana"
 		if serial_nos:
 			if len(serial_nos) > 0:
+				frappe.log_error("serial_nos",serial_nos)
 				for serial in serial_nos:
 					imei = ""
 					serial_no = ""
-					if pi.item_group and pi.item_group.lower() == "iphone".lower():
-						imei = serial
-					elif pi.item_group and pi.item_group.lower() in ['ipad', 'apple watch', 'airpods']:
-						serial_no = serial
-					if filters.get('serial_no'):
-						if filters.get('serial_no') == serial:
+					is_get_group_item=frappe.db.get_value("Item Group",{"name":pi.item_group},"is_group")
+					if is_get_group_item:
+						if pi.item_group and pi.item_group.lower() == "iphone".lower():
+								imei = serial
+						elif pi.item_group and pi.item_group.lower() in ['ipad', 'apple watch', 'airpods']:
+							serial_no = serial
+						if filters.get('serial_no'):
+							if filters.get('serial_no') == serial:
+								data.append({
+									"item_code": pi.item_code,
+									"imei_1": imei,
+									"serial_no": serial_no,
+									"poe": poe,
+									"inward_invoice": pi.bill_no,
+									"inward_delivery_date": pi.bill_date,
+								})
+						else:
 							data.append({
 								"item_code": pi.item_code,
 								"imei_1": imei,
@@ -127,7 +139,14 @@ def get_data(filters=None):
 								"inward_invoice": pi.bill_no,
 								"inward_delivery_date": pi.bill_date,
 							})
+							
 					else:
+						get_group_item=frappe.db.get_value("Item Group",{"name":pi.item_group},"parent_item_group")
+						if pi.item_group and get_group_item.lower() == "iphone".lower():
+							imei = serial
+						elif pi.item_group and get_group_item.lower() in ['ipad', 'apple watch', 'airpods']:
+							serial_no = serial
+						# get_group_item=frappe.db.get_value("Item Group",{"name":si.item_group},"parent_item_group")
 						data.append({
 							"item_code": pi.item_code,
 							"imei_1": imei,

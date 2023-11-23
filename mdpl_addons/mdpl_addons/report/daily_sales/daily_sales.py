@@ -111,13 +111,24 @@ def get_data(filters=None):
 			for serial in serial_nos:
 				imei = ""
 				serial_no = ""
-				if si.item_group and si.item_group.lower() == "iphone".lower():
-					imei = serial
-				elif si.item_group and si.item_group.lower() in ['ipad', 'apple watch', 'airpods']:
-					serial_no = serial
-				
-				if filters.get('serial_no'):
-					if filters.get('serial_no') == serial:
+				is_get_group_item=frappe.db.get_value("Item Group",{"name":si.item_group},"is_group")
+				if is_get_group_item:
+					if si.item_group and si.item_group.lower() == "iphone".lower():
+						imei = serial
+					elif si.item_group and si.item_group.lower() in ['ipad', 'apple watch', 'airpods']:
+						serial_no = serial
+					
+					if filters.get('serial_no'):
+						if filters.get('serial_no') == serial:
+							data.append({
+								"item_code": si.item_code,
+								"imei_1": imei,
+								"serial_no": serial_no,
+								"outward_invoice": si.name,
+								"outward_delivery_date": si.posting_date,
+								"outward_sold": si.apple_id
+							})
+					else:
 						data.append({
 							"item_code": si.item_code,
 							"imei_1": imei,
@@ -127,14 +138,31 @@ def get_data(filters=None):
 							"outward_sold": si.apple_id
 						})
 				else:
-					data.append({
-						"item_code": si.item_code,
-						"imei_1": imei,
-						"serial_no": serial_no,
-						"outward_invoice": si.name,
-						"outward_delivery_date": si.posting_date,
-						"outward_sold": si.apple_id
-					})
+					get_group_item=frappe.db.get_value("Item Group",{"name":si.item_group},"parent_item_group")
+					if si.item_group and get_group_item.lower() == "iphone".lower():
+						imei = serial
+					elif si.item_group and get_group_item.lower() in ['ipad', 'apple watch', 'airpods']:
+						serial_no = serial
+					
+					if filters.get('serial_no'):
+						if filters.get('serial_no') == serial:
+							data.append({
+								"item_code": si.item_code,
+								"imei_1": imei,
+								"serial_no": serial_no,
+								"outward_invoice": si.name,
+								"outward_delivery_date": si.posting_date,
+								"outward_sold": si.apple_id
+							})
+					else:
+						data.append({
+							"item_code": si.item_code,
+							"imei_1": imei,
+							"serial_no": serial_no,
+							"outward_invoice": si.name,
+							"outward_delivery_date": si.posting_date,
+							"outward_sold": si.apple_id
+						})
 		else:
 			data.append({
 				"item_code": si.item_code,

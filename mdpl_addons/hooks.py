@@ -93,6 +93,9 @@ doc_events = {
 	"Bank Transaction": {
 		"on_submit": "mdpl_addons.overides.bank_transaction.get_posting_date"
 	},
+	"Sales Order": {
+		"on_submit": "mdpl_customization.api.validate_sales_order"
+	},
 # 	#"Purchase Receipt":{
 # 	#	"validate":"mdpl_addons.overides.bank_transaction.update_serial_no"
 # 	#}
