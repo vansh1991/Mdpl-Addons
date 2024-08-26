@@ -106,7 +106,7 @@ def get_data(filters=None):
 	for si in si_list:
 		serial_nos = ""
 		serial_nos = si.serial_no
-		serial_nos = serial_nos.split('\n')
+		serial_nos = serial_nos.split('\n') if serial_nos is not None else []
 		if len(serial_nos) > 0:
 			for serial in serial_nos:
 				imei = ""
